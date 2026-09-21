@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://llm-zc86z2f8ixro6odd.cn-beijing.maas.aliyuncs.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta name="description" content="中国大陆一级市场股权投资税务知识问答测试。">
+  <title>税务案头 · 一级市场知识问答</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="会话与知识库">
+      <a class="brand" href="./" aria-label="税务案头首页">
+        <svg viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M8 4h14l6 6v22H8z" stroke="currentColor" stroke-width="1.8"/><path d="M22 4v7h6M13 17h10M13 22h10M13 27h6" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span>税务案头<small>一级市场 · 知识问答</small></span>
+      </a>
+      <button id="new-chat" class="new-chat"><span aria-hidden="true">＋</span> 新建对话</button>
+      <div class="source-card">
+        <p class="eyebrow">本次查阅</p>
+        <div class="source-name">中国大陆一级市场<br>股权投资税务知识要点</div>
+        <div class="source-meta"><span class="paper-tag">初稿</span> 2026.09.21</div>
+        <p>基金架构 · 创投优惠<br>募投管退 · 常见风险</p>
+        <div class="kb-label"><span class="small-dot"></span> tax-law-poc</div>
+      </div>
+      <div class="sidebar-bottom">
+        <button id="share-link" class="nav-button"><span aria-hidden="true">↗</span> 复制体验链接</button>
+        <button id="export-chat" class="nav-button"><span aria-hidden="true">↓</span> 导出对话</button>
+        <button id="open-settings" class="nav-button"><span aria-hidden="true">⚙</span> 连接设置</button>
+        <p class="sidebar-note">记录仅保留在当前浏览器标签页，<br>刷新后可继续对话。</p>
+      </div>
+    </aside>
+    <main class="workspace">
+      <header class="topbar">
+        <div><span class="eyebrow">研究工作台</span><span class="topbar-title">股权投资税务</span></div>
+        <button id="connection-status" class="connection-badge"><span class="small-dot"></span><span id="connection-label">待配置</span></button>
+      </header>
+      <div class="scroll-area" id="scroll-area">
+        <section class="welcome" id="welcome">
+          <div class="welcome-kicker"><span></span> 从一个具体问题开始</div>
+          <h1>把税务问题，<br><em>问清楚。</em></h1>
+          <p class="welcome-description">围绕基金架构、创投优惠与投资退出，<br class="desktop-break">查阅已有资料，梳理下一步需要核实的事项。</p>
+          <div class="suggestions" aria-label="示例问题">
+            <button class="suggestion" data-question="公司制基金与合伙制基金，所得税处理有什么区别？"><span>基金架构</span><strong>公司制与合伙制，如何计税？</strong><i aria-hidden="true">↗</i></button>
+            <button class="suggestion" data-question="享受创投投资额70%抵扣优惠，需要核查哪些条件和材料？"><span>创投优惠</span><strong>70% 抵扣，要核实哪些条件？</strong><i aria-hidden="true">↗</i></button>
+            <button class="suggestion" data-question="基金退出未上市项目股权时，需要留意哪些税务问题？"><span>退出安排</span><strong>退出未上市项目，要留意什么？</strong><i aria-hidden="true">↗</i></button>
+          </div>
+          <div class="scope-note"><span aria-hidden="true">▤</span><p>当前知识库是一份入门概览。提问时补充主体类型、交易日期和项目情况，会更有帮助。</p></div>
+        </section>
+        <section id="messages" class="messages" aria-label="对话记录" aria-live="off" hidden></section>
+      </div>
+      <footer class="composer-area">
+        <form id="chat-form" class="composer">
+          <label class="sr-only" for="question">输入税务问题</label>
+          <textarea id="question" rows="2" maxlength="6000" placeholder="描述你的问题，也可以继续追问…"></textarea>
+          <div class="composer-toolbar"><span id="composer-hint">Enter 发送 · Shift + Enter 换行</span><button id="send-button" class="send-button" type="submit" aria-label="发送问题"><span id="send-label">发送</span><span aria-hidden="true">↑</span></button><button id="stop-button" class="stop-button" type="button" hidden>停止生成</button></div>
+        </form>
+        <p class="footer-note">回答由 AI 结合知识库生成，仅供测试；实际税务处理请核对有效法规。</p>
+      </footer>
+    </main>
+  </div>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <form id="settings-form">
+      <div class="dialog-heading"><div><p class="eyebrow">开始使用</p><h2 id="settings-title">连接税务知识库</h2></div><button id="close-settings" type="button" class="close-button" aria-label="关闭设置">×</button></div>
+      <p class="dialog-description">已预设你的百炼知识问答服务，填入 API Key 即可开始。</p>
+      <label for="api-key">百炼 API Key</label>
+      <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="填入 API Key" required>
+      <p class="field-help">Key 仅存于当前标签页。复制体验链接时会把 Key 带入链接，供同事直接使用；调用费用记入你的百炼账号。</p>
+      <label for="agent-id">应用 ID</label>
+      <input id="agent-id" type="text" spellcheck="false" required>
+      <p id="settings-error" class="settings-error" role="alert"></p>
+      <div class="dialog-actions"><button id="forget-key" type="button" class="text-button">清除 Key</button><button class="primary-button" type="submit">保存并开始</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
