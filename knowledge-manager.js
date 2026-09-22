@@ -1,4 +1,5 @@
-import { createKnowledgeClient, docState, ingestionState, FILE_ACCEPT, sizeLabel, validateFile } from './lib/knowledge.js';
+import { createKnowledgeClient, docState, ingestionState, FILE_ACCEPT, sizeLabel, validateFile } from './lib/knowledge.js?v=20260922-history';
+import { downloadBlob } from './conversation-manager.js?v=20260922-history';
 
 const $ = id => document.getElementById(id);
 const TASK_STORE = 'tax-law-chat.upload-tasks.v1';
@@ -9,6 +10,7 @@ export function initKnowledgeManager({ getKey, openSettings, toast }) {
   let tasks = [], currentPage = 1, total = 0, timer, listBusy = false, uploading = false;
   let uploadController, selectedDoc = null, removing = false, stopped = false;
   const pendingRemovals = new Map();
+  const downloads = new Map();
   const dialog = $('knowledge-dialog');
   try {
     const saved = JSON.parse(sessionStorage.getItem(TASK_STORE) || '[]');
@@ -122,12 +124,38 @@ export function initKnowledgeManager({ getKey, openSettings, toast }) {
       const remove = button('移除', () => openRemove(doc), 'remove-document-button');
       remove.disabled = doc.canDelete === false || Boolean(removingAt) || uploading;
       remove.setAttribute('aria-label', `移除 ${doc.doc_name || doc.doc_id}`);
-      row.append(type, body, badge, remove); list.append(row);
+      const download = button(downloads.has(doc.doc_id) ? '取消下载' : '下载', () => void downloadDocument(doc), 'text-button download-document-button');
+      download.disabled = Boolean(removingAt);
+      download.setAttribute('aria-label', `${downloads.has(doc.doc_id) ? '取消下载' : '下载原文件'} ${doc.doc_name || doc.doc_id}`);
+      const actions = document.createElement('div'); actions.className = 'document-actions'; actions.append(download, remove);
+      row.append(type, body, badge, actions); list.append(row);
     }
     $('document-count').textContent = total;
     $('documents-page').textContent = `第 ${currentPage} / ${Math.max(1, Math.ceil(total / 20))} 页`;
     $('documents-prev').disabled = currentPage <= 1;
     $('documents-next').disabled = currentPage * 20 >= total;
+  }
+  async function downloadDocument(doc) {
+    if (downloads.has(doc.doc_id)) { downloads.get(doc.doc_id).abort(); return; }
+    if (downloads.size) return toast('请等待当前文件下载完成，或先取消下载。');
+    const controller = new AbortController(); downloads.set(doc.doc_id, controller);
+    errorMessage('');
+    // Update only this row so a slow refresh cannot make the action appear idle.
+    const update = () => {
+      for (const row of $('documents-list').children) {
+        const button = row.querySelector('.download-document-button');
+        if (button?.getAttribute('aria-label')?.endsWith(` ${doc.doc_name || doc.doc_id}`)) {
+          button.textContent = downloads.has(doc.doc_id) ? '取消下载' : '下载';
+          button.setAttribute('aria-label', `${downloads.has(doc.doc_id) ? '取消下载' : '下载原文件'} ${doc.doc_name || doc.doc_id}`);
+        }
+      }
+    };
+    update();
+    try {
+      const result = await client().download(doc, controller.signal);
+      downloadBlob(result.blob, result.name); toast('原文件已交给浏览器下载，请在下载列表中查看。');
+    } catch (error) { errorMessage(error.message); }
+    finally { downloads.delete(doc.doc_id); update(); }
   }
   async function refresh(quiet = false) {
     if (listBusy || !getKey()) return;
@@ -197,5 +225,5 @@ export function initKnowledgeManager({ getKey, openSettings, toast }) {
   $('confirm-remove-document').addEventListener('click', () => void confirmRemove());
   $('remove-document-dialog').addEventListener('cancel', event => { if (removing) event.preventDefault(); });
   window.addEventListener('beforeunload', event => { if (uploading) { event.preventDefault(); event.returnValue = ''; } });
-  return { isBusy: () => uploading || removing };
+  return { isBusy: () => uploading || removing || downloads.size > 0 };
 }

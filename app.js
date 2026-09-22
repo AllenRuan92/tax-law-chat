@@ -1,11 +1,11 @@
 import { DEFAULT_AGENT, ENDPOINT, buildMessages, eventMeaning, readSSE } from './lib/chat.js';
 import { renderMarkdown } from './lib/markdown.js';
-import { initKnowledgeManager } from './knowledge-manager.js';
+import { initKnowledgeManager } from './knowledge-manager.js?v=20260922-history';
+import { initConversationManager } from './conversation-manager.js?v=20260922-history';
 
 const $ = id => document.getElementById(id);
-const STORE = 'tax-law-chat.v1';
 const KEY_STORE = 'tax-law-chat.key';
-let key = '', agent = DEFAULT_AGENT, turns = [], active = null, toastTimer;
+let key = '', agent = DEFAULT_AGENT, turns = [], active = null, toastTimer, conversationManager, importedAgent, historyReady = false;
 const nodes = new Map();
 
 function toast(message) {
@@ -16,22 +16,14 @@ function toast(message) {
 }
 function persist() {
   try {
-    sessionStorage.setItem(STORE, JSON.stringify({ agent, turns: turns.slice(-80) }));
     if (key) sessionStorage.setItem(KEY_STORE, key);
     else sessionStorage.removeItem(KEY_STORE);
   } catch { toast('浏览器无法保存本次会话，刷新后需重新配置。'); }
+  return conversationManager?.save();
 }
 function restore() {
   try {
-    const saved = JSON.parse(sessionStorage.getItem(STORE) || '{}');
     key = sessionStorage.getItem(KEY_STORE) || '';
-    if (/^aid-[\w-]+$/.test(saved.agent)) agent = saved.agent;
-    if (Array.isArray(saved.turns)) turns = saved.turns.filter(t =>
-      ['user', 'assistant'].includes(t.role) && typeof t.content === 'string'
-    ).slice(-80).map(t => ({ ...t, id: crypto.randomUUID(),
-      status: t.status === 'pending' ? 'stopped' : t.status,
-      error: t.status === 'pending' ? '上次回答因页面刷新而中断。' : t.error,
-    }));
   } catch { /* An unreadable previous session must not block a new conversation. */ }
   const fragment = new URLSearchParams(location.hash.slice(1));
   if (fragment.has('access_key')) {
@@ -40,9 +32,8 @@ function restore() {
     history.replaceState(null, '', location.pathname + location.search);
     if (imported && imported.length < 4096 && !/\s/.test(imported)) {
       key = imported;
-      const importedAgent = fragment.get('agent_id');
-      if (/^aid-[\w-]+$/.test(importedAgent)) agent = importedAgent;
-      turns = []; // Sharing provides access, never someone else's conversation.
+      const sharedAgent = fragment.get('agent_id');
+      if (/^aid-[\w-]+$/.test(sharedAgent)) importedAgent = sharedAgent;
       persist();
       toast('连接信息已导入，可以开始提问。');
     } else toast('体验链接中的 Key 无效，请在连接设置中重新填写。');
@@ -137,7 +128,7 @@ function friendlyError(error, request) {
 }
 async function send() {
   const question = $('question').value.trim();
-  if (!question || active) return;
+  if (!question || active || !historyReady || conversationManager.isChanging()) return;
   if (!key) { openSettings(); return; }
   const messages = buildMessages(turns, question);
   const user = { id: crypto.randomUUID(), role: 'user', content: question, status: 'complete' };
@@ -149,6 +140,7 @@ async function send() {
   const request = { controller: new AbortController(), timedOut: false };
   active = request; setBusy(true);
   let completed = false, paintTimer;
+  const saveTimer = setInterval(persist, 2000);
   const timeout = setTimeout(() => { request.timedOut = true; request.controller.abort(); }, 180000);
   const schedulePaint = () => {
     if (paintTimer) return;
@@ -180,7 +172,7 @@ async function send() {
     answer.error = friendlyError(error, request);
     toast(answer.status === 'stopped' ? '已停止生成。' : '本次回答未完成，可点击「重新提问」。');
   } finally {
-    clearTimeout(timeout); clearTimeout(paintTimer);
+    clearTimeout(timeout); clearTimeout(paintTimer); clearInterval(saveTimer);
     active = null; setBusy(false); paint(answer); persist(); scrollBottom();
   }
 }
@@ -195,21 +187,18 @@ $('stop-button').addEventListener('click', () => active?.controller.abort());
 document.querySelectorAll('.suggestion').forEach(button => button.addEventListener('click', () => {
   $('question').value = button.dataset.question; $('question').focus(); void send();
 }));
-$('new-chat').addEventListener('click', () => {
-  if (active) return;
-  if (turns.length && !confirm('开始新对话会清空当前记录。需要保留时，请先导出对话。')) return;
-  turns = []; persist(); renderAll(); $('question').value = ''; $('question').focus();
-});
+$('question').addEventListener('input', () => { if (historyReady) void persist(); });
 ['open-settings', 'connection-status'].forEach(id => $(id).addEventListener('click', openSettings));
 $('close-settings').addEventListener('click', () => $('settings-dialog').close());
 $('settings-dialog').addEventListener('close', () => { $('api-key').value = ''; });
-$('settings-form').addEventListener('submit', event => {
+$('settings-form').addEventListener('submit', async event => {
   event.preventDefault();
+  if (!historyReady || conversationManager.isChanging()) return;
   if (active || knowledgeManager.isBusy()) { $('settings-error').textContent = '请先结束当前问答或文件操作，再修改连接设置。'; return; }
   const nextKey = $('api-key').value.trim(), nextAgent = $('agent-id').value.trim();
   if (!nextKey || /\s/.test(nextKey) || nextKey.length > 4096) { $('settings-error').textContent = '请填入有效的 API Key，不要包含空格或换行。'; return; }
   if (!/^aid-[\w-]+$/.test(nextAgent)) { $('settings-error').textContent = '请填写知识问答服务的应用 ID（aid- 开头）。'; return; }
-  if (agent !== nextAgent) { turns = []; renderAll(); }
+  if (agent !== nextAgent && !await conversationManager.create(nextAgent)) return;
   key = nextKey; agent = nextAgent; persist(); updateConnection();
   $('settings-dialog').close(); toast('连接设置已保存，发送问题即可验证。'); $('question').focus();
 });
@@ -236,3 +225,10 @@ $('export-chat').addEventListener('click', () => {
 });
 restore(); updateConnection(); renderAll();
 const knowledgeManager = initKnowledgeManager({ getKey: () => key, openSettings, toast });
+$('send-button').disabled = true; $('new-chat').disabled = true;
+conversationManager = await initConversationManager({
+  getState: () => ({ agent, turns, draft: $('question').value }),
+  setState: row => { agent = row.agent; turns = row.turns; $('question').value = row.draft; renderAll(); updateConnection(); },
+  isBusy: () => Boolean(active), toast, importedAgent,
+});
+historyReady = true; $('send-button').disabled = false; $('new-chat').disabled = false;

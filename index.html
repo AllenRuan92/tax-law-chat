@@ -8,8 +8,8 @@
   <meta name="description" content="中国大陆一级市场股权投资税务知识问答测试。">
   <title>税务案头 · 一级市场知识问答</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./styles.css">
-  <script type="module" src="./app.js"></script>
+  <link rel="stylesheet" href="./styles.css?v=20260922-history">
+  <script type="module" src="./app.js?v=20260922-history"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -19,24 +19,30 @@
         <span>税务案头<small>一级市场 · 知识问答</small></span>
       </a>
       <button id="new-chat" class="new-chat"><span aria-hidden="true">＋</span> 新建对话</button>
-      <div class="source-card">
-        <p class="eyebrow">本次查阅</p>
+      <button id="open-history" class="mobile-history" title="历史对话" aria-label="历史对话">☷</button>
+      <section class="history-panel" aria-label="本机历史对话">
+        <div class="history-heading"><span class="eyebrow">本机对话</span><span>仅自己可见</span></div>
+        <div class="history-list" data-conversation-list></div>
+        <div class="history-backup"><button class="text-button" data-export-history>导出备份</button><button class="text-button" data-import-history>导入备份</button></div>
+      </section>
+      <details class="source-card">
+        <summary>当前知识库 · tax-law-poc</summary>
         <div class="source-name">中国大陆一级市场<br>股权投资税务知识要点</div>
         <div class="source-meta"><span class="paper-tag">初稿</span> 2026.09.21</div>
         <p>基金架构 · 创投优惠<br>募投管退 · 常见风险</p>
         <div class="kb-label"><span class="small-dot"></span> tax-law-poc</div>
-      </div>
+      </details>
       <div class="sidebar-bottom">
         <button id="open-knowledge" class="nav-button" title="知识库管理"><span aria-hidden="true">▤</span> 知识库管理</button>
         <button id="share-link" class="nav-button"><span aria-hidden="true">↗</span> 复制体验链接</button>
         <button id="export-chat" class="nav-button"><span aria-hidden="true">↓</span> 导出对话</button>
         <button id="open-settings" class="nav-button"><span aria-hidden="true">⚙</span> 连接设置</button>
-        <p class="sidebar-note">记录仅保留在当前浏览器标签页，<br>刷新后可继续对话。</p>
+        <p class="sidebar-note">对话仅存本机。清理站点数据会删除记录，请定期导出备份。</p>
       </div>
     </aside>
     <main class="workspace">
       <header class="topbar">
-        <div><span class="eyebrow">研究工作台</span><span class="topbar-title">股权投资税务</span></div>
+        <div><span class="eyebrow">研究工作台</span><span id="current-title" class="topbar-title">新对话</span></div>
         <button id="connection-status" class="connection-badge"><span class="small-dot"></span><span id="connection-label">待配置</span></button>
       </header>
       <div class="scroll-area" id="scroll-area">
@@ -60,9 +66,28 @@
           <div class="composer-toolbar"><span id="composer-hint">Enter 发送 · Shift + Enter 换行</span><button id="send-button" class="send-button" type="submit" aria-label="发送问题"><span id="send-label">发送</span><span aria-hidden="true">↑</span></button><button id="stop-button" class="stop-button" type="button" hidden>停止生成</button></div>
         </form>
         <p class="footer-note">回答由 AI 结合知识库生成，仅供测试；实际税务处理请核对有效法规。</p>
+        <p class="history-storage" data-history-status role="status">正在读取本机对话…</p>
       </footer>
     </main>
   </div>
+  <input id="history-file" type="file" accept=".json,application/json" hidden>
+  <dialog id="history-dialog" aria-labelledby="history-title">
+    <div class="dialog-heading"><h2 id="history-title">本机历史对话</h2><button id="close-history" class="close-button" aria-label="关闭历史对话">×</button></div>
+    <p class="field-help">清理此站点数据会删除本机记录。换设备时，可导出备份再导入。</p>
+    <button id="history-new" class="secondary-button">＋ 新建对话</button>
+    <div class="history-list" data-conversation-list></div>
+    <div class="history-backup"><button class="text-button" data-export-history>导出全部备份</button><button class="text-button" data-import-history>导入备份</button></div>
+    <p class="history-storage" data-history-status></p>
+  </dialog>
+  <dialog id="conversation-dialog" aria-labelledby="conversation-title">
+    <form id="conversation-form">
+      <div class="dialog-heading"><h2 id="conversation-title">管理对话</h2><button id="close-conversation" type="button" class="close-button" aria-label="关闭对话管理">×</button></div>
+      <label for="conversation-name">对话名称</label><input id="conversation-name" maxlength="80" required autocomplete="off">
+      <p class="field-help">重命名或删除仅影响此浏览器的记录，不影响知识库文件。</p>
+      <p id="conversation-error" class="settings-error" role="alert"></p>
+      <div class="dialog-actions"><button id="delete-conversation" type="button" class="text-button">删除此对话</button><button class="primary-button" type="submit">保存名称</button></div>
+    </form>
+  </dialog>
   <dialog id="knowledge-dialog" class="knowledge-dialog" aria-labelledby="knowledge-title">
     <div class="knowledge-heading">
       <div><p class="eyebrow">税务案头 / 资料管理</p><h2 id="knowledge-title">知识库管理</h2><p class="knowledge-subtitle">tax-law-poc <span>标准版 · 已绑定当前问答服务</span></p></div>
