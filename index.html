@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://llm-zc86z2f8ixro6odd.cn-beijing.maas.aliyuncs.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://llm-zc86z2f8ixro6odd.cn-beijing.maas.aliyuncs.com https://dashscope-file-datacenter-prod-01.oss-cn-beijing.aliyuncs.com https://tax-lawad-proxy-mosqgiygtw.cn-beijing.fcapp.run; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
   <meta name="description" content="中国大陆一级市场股权投资税务知识问答测试。">
   <title>税务案头 · 一级市场知识问答</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
@@ -27,6 +27,7 @@
         <div class="kb-label"><span class="small-dot"></span> tax-law-poc</div>
       </div>
       <div class="sidebar-bottom">
+        <button id="open-knowledge" class="nav-button" title="知识库管理"><span aria-hidden="true">▤</span> 知识库管理</button>
         <button id="share-link" class="nav-button"><span aria-hidden="true">↗</span> 复制体验链接</button>
         <button id="export-chat" class="nav-button"><span aria-hidden="true">↓</span> 导出对话</button>
         <button id="open-settings" class="nav-button"><span aria-hidden="true">⚙</span> 连接设置</button>
@@ -48,7 +49,7 @@
             <button class="suggestion" data-question="享受创投投资额70%抵扣优惠，需要核查哪些条件和材料？"><span>创投优惠</span><strong>70% 抵扣，要核实哪些条件？</strong><i aria-hidden="true">↗</i></button>
             <button class="suggestion" data-question="基金退出未上市项目股权时，需要留意哪些税务问题？"><span>退出安排</span><strong>退出未上市项目，要留意什么？</strong><i aria-hidden="true">↗</i></button>
           </div>
-          <div class="scope-note"><span aria-hidden="true">▤</span><p>当前知识库是一份入门概览。提问时补充主体类型、交易日期和项目情况，会更有帮助。</p></div>
+          <div class="scope-note"><span aria-hidden="true">▤</span><p>资料可在「知识库管理」中补充。提问时说明主体类型、交易日期和项目情况，会更有帮助。</p></div>
         </section>
         <section id="messages" class="messages" aria-label="对话记录" aria-live="off" hidden></section>
       </div>
@@ -62,6 +63,36 @@
       </footer>
     </main>
   </div>
+  <dialog id="knowledge-dialog" class="knowledge-dialog" aria-labelledby="knowledge-title">
+    <div class="knowledge-heading">
+      <div><p class="eyebrow">税务案头 / 资料管理</p><h2 id="knowledge-title">知识库管理</h2><p class="knowledge-subtitle">tax-law-poc <span>标准版 · 已绑定当前问答服务</span></p></div>
+      <button id="close-knowledge" type="button" class="close-button" aria-label="关闭知识库管理">×</button>
+    </div>
+    <div class="knowledge-body">
+      <section class="upload-section" aria-labelledby="upload-title">
+        <div><h3 id="upload-title">补充一份资料</h3><p>上传到百炼，解析完成后供所有试用者检索。新旧法规建议在文件名中注明日期与版本。</p></div>
+        <label id="drop-zone" class="drop-zone" for="knowledge-files"><span class="upload-symbol" aria-hidden="true">↑</span><strong>选择文件，或拖拽到这里</strong><span>PDF · Word · PPT · TXT · Markdown · HTML · Excel · 图片</span><input id="knowledge-files" type="file" multiple class="sr-only"></label>
+        <p class="upload-help">文档 ≤150 MB / 1,000 页；文本与 Excel 本页限 10 MB，图片限 20 MB。每批最多 10 个。解析和向量化可能产生费用。</p>
+        <ul id="upload-queue" class="upload-queue" aria-label="本次上传任务" hidden></ul>
+        <div class="upload-actions"><span id="upload-summary" role="status"></span><button id="clear-upload-queue" class="text-button" type="button" hidden>清空任务记录</button><button id="stop-upload" class="stop-button" type="button" hidden>停止上传</button><button id="start-upload" class="primary-button" type="button" disabled>开始上传</button></div>
+      </section>
+      <section class="documents-section" aria-labelledby="documents-title">
+        <div class="documents-toolbar"><div><h3 id="documents-title">库内文档 <span id="document-count">—</span></h3><p id="documents-updated">按百炼返回结果展示</p></div><button id="refresh-documents" class="secondary-button" type="button">刷新列表</button></div>
+        <p id="knowledge-error" class="knowledge-error" role="alert" hidden></p>
+        <div id="documents-list" class="documents-list" aria-live="polite"></div>
+        <div class="document-pagination"><button id="documents-prev" class="text-button" type="button" disabled>上一页</button><span id="documents-page">第 1 页</span><button id="documents-next" class="text-button" type="button" disabled>下一页</button></div>
+      </section>
+      <p class="management-note">小范围 POC：持有当前 Key 的试用者均可管理资料。移除只影响本知识库，源文件保留在百炼数据中心；此处不提供删除整个知识库的操作。</p>
+    </div>
+  </dialog>
+  <dialog id="remove-document-dialog" aria-labelledby="remove-document-title">
+    <h2 id="remove-document-title">从知识库移除此文档？</h2>
+    <p id="remove-document-name" class="remove-document-name"></p>
+    <p class="dialog-description">会删除这份文档在 tax-law-poc 中的索引和切片，所有试用者将无法再检索它。百炼数据中心的源文件会保留，可重新导入。生效可能延迟约 30 秒。</p>
+    <label class="remove-confirm-label"><input id="remove-document-check" type="checkbox"> 我确认移除上述文档，不是删除整个知识库</label>
+    <p id="remove-document-error" class="settings-error" role="alert"></p>
+    <div class="dialog-actions"><button id="cancel-remove-document" class="text-button" type="button">取消</button><button id="confirm-remove-document" class="danger-button" type="button" disabled>确认移除</button></div>
+  </dialog>
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <form id="settings-form">
       <div class="dialog-heading"><div><p class="eyebrow">开始使用</p><h2 id="settings-title">连接税务知识库</h2></div><button id="close-settings" type="button" class="close-button" aria-label="关闭设置">×</button></div>

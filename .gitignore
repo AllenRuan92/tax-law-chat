@@ -6,3 +6,5 @@ node_modules/
 output/
 *.local.*
 access-link.txt
+fc/.s/
+fc/.serverless/

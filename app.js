@@ -1,5 +1,6 @@
 import { DEFAULT_AGENT, ENDPOINT, buildMessages, eventMeaning, readSSE } from './lib/chat.js';
 import { renderMarkdown } from './lib/markdown.js';
+import { initKnowledgeManager } from './knowledge-manager.js';
 
 const $ = id => document.getElementById(id);
 const STORE = 'tax-law-chat.v1';
@@ -204,7 +205,7 @@ $('close-settings').addEventListener('click', () => $('settings-dialog').close()
 $('settings-dialog').addEventListener('close', () => { $('api-key').value = ''; });
 $('settings-form').addEventListener('submit', event => {
   event.preventDefault();
-  if (active) { $('settings-error').textContent = '请先停止当前回答，再修改连接设置。'; return; }
+  if (active || knowledgeManager.isBusy()) { $('settings-error').textContent = '请先结束当前问答或文件操作，再修改连接设置。'; return; }
   const nextKey = $('api-key').value.trim(), nextAgent = $('agent-id').value.trim();
   if (!nextKey || /\s/.test(nextKey) || nextKey.length > 4096) { $('settings-error').textContent = '请填入有效的 API Key，不要包含空格或换行。'; return; }
   if (!/^aid-[\w-]+$/.test(nextAgent)) { $('settings-error').textContent = '请填写知识问答服务的应用 ID（aid- 开头）。'; return; }
@@ -213,7 +214,7 @@ $('settings-form').addEventListener('submit', event => {
   $('settings-dialog').close(); toast('连接设置已保存，发送问题即可验证。'); $('question').focus();
 });
 $('forget-key').addEventListener('click', () => {
-  if (active) { $('settings-error').textContent = '请先停止当前回答，再清除 Key。'; return; }
+  if (active || knowledgeManager.isBusy()) { $('settings-error').textContent = '请先结束当前问答或文件操作，再清除 Key。'; return; }
   key = ''; persist(); updateConnection(); $('api-key').value = '';
   toast('当前标签页的 Key 已清除；已发出的体验链接仍可使用。');
 });
@@ -234,3 +235,4 @@ $('export-chat').addEventListener('click', () => {
   link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 restore(); updateConnection(); renderAll();
+const knowledgeManager = initKnowledgeManager({ getKey: () => key, openSettings, toast });
