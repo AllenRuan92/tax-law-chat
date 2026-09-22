@@ -15,8 +15,8 @@ export function validMessages(messages) {
   return messages.every((m, i) => m && Object.keys(m).length === 2 && m.role === (i % 2 ? 'assistant' : 'user') && typeof m.content === 'string' && m.content.trim() && m.content.length <= (i % 2 ? 24000 : 6000) && (total += m.content.length) <= 24000);
 }
 export function createHandler({ env = process.env, fetcher = globalThis.fetch, now = Date.now } = {}) {
-  // Best-effort per warm instance, NOT a durable global spending quota.
-  const limits = new Map();
+  // Public POC is an explicit deployment choice, not an accidentally missing credential.
+  // There is intentionally no application-level rate limiter in this version.
   return async event => {
     let request;
     try {
@@ -27,8 +27,8 @@ export function createHandler({ env = process.env, fetcher = globalThis.fetch, n
     const headers = Object.fromEntries(Object.entries(request.headers || {}).map(([k, v]) => [k.toLowerCase(), v]));
     const method = request.requestContext?.http?.method;
     const path = request.rawPath || request.requestContext?.http?.path;
-    if (!/^[a-zA-Z0-9]{3,32}$/.test(env.WECHAT_TOKEN || '') || !/^[\w+/]{43}$/.test(env.WECHAT_AES_KEY || '') || (env.SESSION_SIGNING_KEY || '').length < 32) return json(503, '服务尚未配置。');
     if (path === '/wechat/callback') {
+      if (!/^[a-zA-Z0-9]{3,32}$/.test(env.WECHAT_TOKEN || '') || !/^[\w+/]{43}$/.test(env.WECHAT_AES_KEY || '') || (env.SESSION_SIGNING_KEY || '').length < 32) return json(503, '消息回调尚未配置。');
       try {
         const query = request.queryParameters || request.queryStringParameters || Object.fromEntries(new URLSearchParams(request.rawQueryString || ''));
         const { timestamp, nonce } = query;
@@ -49,9 +49,10 @@ export function createHandler({ env = process.env, fetcher = globalThis.fetch, n
         const message = parseXml(decrypt(outer.Encrypt, env.WECHAT_AES_KEY, APP_ID));
         if (!message.FromUserName || message.FromUserName.length > 128 || !message.ToUserName || message.ToUserName.length > 128) throw new Error();
         if (message.MsgType === 'event' && message.Event !== 'subscribe') return reply(200, 'success');
-        const token = mintAccess(message.FromUserName, env.SESSION_SIGNING_KEY, APP_ID, now());
-        const link = CHAT_PAGE + '#access=' + token;
-        const content = `欢迎来到税务案头。\n\n<a href="${link}">点这里开始税务问答</a>\n\n可连续追问，无需填写密钥。入口 24 小时有效；过期后在本公众号再发一条消息即可。\n请勿转发专属入口。回答仅供研究参考，请核对现行法规。`;
+        const publicChat = env.PUBLIC_CHAT === 'true';
+        const link = publicChat ? CHAT_PAGE : CHAT_PAGE + '#access=' + mintAccess(message.FromUserName, env.SESSION_SIGNING_KEY, APP_ID, now());
+        const entryNote = publicChat ? '公开试用，无需登录或填写密钥。固定入口不设到期时间。' : '无需填写密钥。入口 24 小时有效；过期后请重新发送消息获取入口，请勿转发专属链接。';
+        const content = `欢迎来到税务案头。\n\n<a href="${link}">点这里开始税务问答</a>\n\n可连续追问。${entryNote}\n回答仅供研究参考，请核对现行法规。`;
         const xml = `<xml><ToUserName>${cdata(message.FromUserName)}</ToUserName><FromUserName>${cdata(message.ToUserName)}</FromUserName><CreateTime>${Math.floor(now() / 1000)}</CreateTime><MsgType><![CDATA[text]]></MsgType><Content>${cdata(content)}</Content></xml>`;
         const encrypted = encrypt(xml, env.WECHAT_AES_KEY, APP_ID), stamp = String(Math.floor(now() / 1000)), salt = randomBytes(12).toString('hex');
         return reply(200, `<xml><Encrypt>${cdata(encrypted)}</Encrypt><MsgSignature>${cdata(signature(env.WECHAT_TOKEN, stamp, salt, encrypted))}</MsgSignature><TimeStamp>${stamp}</TimeStamp><Nonce>${cdata(salt)}</Nonce></xml>`, {}, 'application/xml; charset=utf-8');
@@ -67,9 +68,11 @@ export function createHandler({ env = process.env, fetcher = globalThis.fetch, n
       return reply(204, '', { ...cors, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Authorization, Content-Type', 'access-control-max-age': '600' });
     }
     if (method !== 'POST') return json(405, '仅支持 POST。', cors);
-    let visitor;
-    try { visitor = verifyAccess(/^Bearer ([\w.-]+)$/.exec(headers.authorization || '')?.[1], env.SESSION_SIGNING_KEY, APP_ID, now()); }
-    catch { return json(401, '入口已失效，请回到「钻木者得火」公众号发送消息，获取新入口。', cors); }
+    if (env.PUBLIC_CHAT !== 'true') {
+      if ((env.SESSION_SIGNING_KEY || '').length < 32) return json(503, '问答访问模式尚未配置。', cors);
+      try { verifyAccess(/^Bearer ([\w.-]+)$/.exec(headers.authorization || '')?.[1], env.SESSION_SIGNING_KEY, APP_ID, now()); }
+      catch { return json(401, '当前服务未开放公开试用，请联系管理员。', cors); }
+    }
     if (!/^application\/json(?:\s*;|$)/i.test(headers['content-type'] || '')) return json(415, '仅接受 JSON。', cors);
     let messages;
     try {
@@ -81,11 +84,6 @@ export function createHandler({ env = process.env, fetcher = globalThis.fetch, n
       messages = input.messages.map(({ role, content }) => ({ role, content }));
     } catch { return json(400, '问题或上下文过长，请缩短问题或新建对话。', cors); }
     if (!env.DASHSCOPE_API_KEY) return json(503, '问答服务尚未配置。', cors);
-    const time = now();
-    for (const [id, state] of limits) if (state.until <= time) limits.delete(id);
-    const limit = limits.get(visitor.sub) || { until: time + 60000, count: 0, busy: false };
-    if (limit.busy || limit.count >= 6 || limits.size >= 2000) return json(429, '提问较频繁，请稍等片刻再试。', cors);
-    limit.count++; limit.busy = true; limits.set(visitor.sub, limit);
     try {
       const response = await fetcher(ENDPOINT, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(150000),
         headers: { Authorization: `Bearer ${env.DASHSCOPE_API_KEY}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
@@ -101,7 +99,6 @@ export function createHandler({ env = process.env, fetcher = globalThis.fetch, n
       if (!complete || !answer.trim()) throw new Error('Incomplete output');
       return json(200, null, cors, { answer });
     } catch { return json(502, '未收到完整回答，请稍后重试。', cors); }
-    finally { limit.busy = false; }
   };
 }
 const handle = createHandler();

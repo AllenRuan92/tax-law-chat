@@ -84,10 +84,47 @@ test('chat forwards only fixed app/context; aggregates SSE; errors and private o
     const response = await createHandler({ env, now: () => time, fetcher })(chat()); assert.equal(response.statusCode, 502); assert.ok(!response.body.includes(env.DASHSCOPE_API_KEY));
   }
 });
-test('best effort per-subject rate limits do not mix visitor context', async () => {
+test('no application request-count limit; contexts still stay independent', async () => {
   const contexts = [], handler = createHandler({ env, now: () => time, fetcher: async (u, req) => { contexts.push(JSON.parse(req.body).input.messages); return sse('答'); } });
   for (let n = 0; n < 6; n++) assert.equal((await handler(chat())).statusCode, 200);
-  assert.equal((await handler(chat())).statusCode, 429);
+  assert.equal((await handler(chat())).statusCode, 200);
   const other = mintAccess('someone-else', env.SESSION_SIGNING_KEY, APP_ID, time);
   assert.equal((await handler(chat([{ role: 'user', content: '独立问题' }], other))).statusCode, 200); assert.deepEqual(contexts.at(-1), [{ role: 'user', content: '独立问题' }]);
+});
+test('public POC accepts missing, invalid and expired tokens without WeChat configuration', async () => {
+  let calls = 0;
+  const handler = createHandler({ env: { PUBLIC_CHAT: 'true', DASHSCOPE_API_KEY: env.DASHSCOPE_API_KEY }, now: () => time + 86400001, fetcher: async () => { calls++; return sse('公开问答'); } });
+  const anonymous = chat(); delete anonymous.headers.authorization;
+  for (const request of [anonymous, chat(undefined, 'invalid'), chat()]) assert.equal((await handler(request)).statusCode, 200);
+  assert.equal(calls, 3);
+  assert.equal((await handler({ ...anonymous, rawPath: '/wechat/callback' })).statusCode, 503);
+  assert.equal((await handler({ ...anonymous, headers: { ...anonymous.headers, origin: 'https://other.example' } })).statusCode, 403);
+  assert.equal((await handler({ ...anonymous, body: JSON.stringify({ messages: [{ role: 'system', content: 'x' }] }) })).statusCode, 400);
+});
+test('public POC must be explicitly enabled and never opens knowledge management', async () => {
+  const anonymous = chat(); delete anonymous.headers.authorization;
+  for (const flag of [undefined, 'false', 'TRUE', '1']) {
+    const handler = createHandler({ env: { ...env, PUBLIC_CHAT: flag }, now: () => time });
+    assert.equal((await handler(anonymous)).statusCode, 401);
+  }
+  const handler = createHandler({ env: { ...env, PUBLIC_CHAT: 'true' }, now: () => time });
+  assert.equal((await handler({ ...anonymous, rawPath: '/manage' })).statusCode, 404);
+  const noKey = createHandler({ env: { PUBLIC_CHAT: 'true' } });
+  assert.equal((await noKey(anonymous)).statusCode, 503);
+});
+test('public callback returns only the fixed URL and retains encrypted callback validation', async () => {
+  const handler = createHandler({ env: { ...env, PUBLIC_CHAT: 'true' }, now: () => time });
+  const response = await handler(callback()), outer = parseXml(response.body);
+  const content = parseXml(decrypt(outer.Encrypt, env.WECHAT_AES_KEY, APP_ID)).Content;
+  assert.match(content, /href="https:\/\/allenruan92.github.io\/tax-law-chat\/wechat.html"/);
+  assert.ok(!content.includes('#access=')); assert.ok(!content.includes('24 小时'));
+  const invalid = callback(); invalid.queryParameters.msg_signature = 'bad';
+  assert.equal((await handler(invalid)).statusCode, 403);
+});
+test('public POC has no application concurrency lock', async () => {
+  let calls = 0, release; const gate = new Promise(resolve => release = resolve);
+  const handler = createHandler({ env: { ...env, PUBLIC_CHAT: 'true' }, fetcher: async () => { calls++; await gate; return sse('并行答案'); } });
+  const requests = Array.from({ length: 8 }, () => handler(chat(undefined, '')));
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(calls, 8);
+  release(); assert.ok((await Promise.all(requests)).every(response => response.statusCode === 200));
 });

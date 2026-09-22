@@ -9,7 +9,8 @@ import SDK from '@alicloud/fc20230330';
 import Core from '@alicloud/openapi-core';
 
 const root = fileURLToPath(new URL('../', import.meta.url)), out = path.join(root, 'output/wechat');
-const name = 'tax-law-wechat-bot', description = 'Tax law POC - encrypted WeChat entry and signed visitor chat only';
+const name = 'tax-law-wechat-bot', description = 'Tax law POC - public fixed-link chat and optional encrypted callback';
+const legacyDescription = 'Tax law POC - encrypted WeChat entry and signed visitor chat only';
 const configPath = path.join(out, 'secrets.local.json');
 async function main() {
   fs.mkdirSync(out, { recursive: true });
@@ -32,17 +33,25 @@ async function main() {
   const client = new SDK.default(new Core.$OpenApiUtil.Config({ accessKeyId: profile.access_key_id, accessKeySecret: profile.access_key_secret, endpoint: 'fcv3.cn-beijing.aliyuncs.com', regionId: 'cn-beijing', protocol: 'https', readTimeout: 60000, connectTimeout: 10000 }));
   let existing;
   try { existing = (await client.getFunction(name, new SDK.GetFunctionRequest({}))).body; } catch (e) { if (e.code !== 'FunctionNotFound') throw e; }
+  if (existing && (!process.argv.includes('--resume') || ![description, legacyDescription].includes(existing.description) || existing.handler !== 'index.handler' || Object.keys(secrets).some(k => existing.environmentVariables?.[k] !== secrets[k]))) throw new Error('Existing resource mismatch or --resume missing');
+  const publicChat = process.argv.includes('--public-chat') || existing?.environmentVariables?.PUBLIC_CHAT === 'true';
+  const readConcurrency = async () => { try { return (await client.getConcurrencyConfig(name)).body?.reservedConcurrency; } catch (e) { if (e.statusCode === 404) return undefined; throw e; } };
+  const oldConcurrency = existing ? await readConcurrency() : undefined;
+  if (publicChat && oldConcurrency !== undefined && oldConcurrency !== 2) throw new Error('Concurrency differs from the known POC configuration');
   const code = new SDK.InputCodeLocation({ zipFile: fs.readFileSync(zip).toString('base64') });
-  const environmentVariables = { ...secrets, DASHSCOPE_API_KEY: key };
+  const environmentVariables = { ...existing?.environmentVariables, ...secrets, DASHSCOPE_API_KEY: key, PUBLIC_CHAT: String(publicChat) };
   if (existing) {
-    if (!process.argv.includes('--resume') || existing.description !== description || existing.handler !== 'index.handler' || Object.keys(secrets).some(k => existing.environmentVariables?.[k] !== secrets[k])) throw new Error('Existing resource mismatch or --resume missing');
-    await client.updateFunction(name, new SDK.UpdateFunctionRequest({ body: new SDK.UpdateFunctionInput({ code, environmentVariables }) }));
+    await client.updateFunction(name, new SDK.UpdateFunctionRequest({ body: new SDK.UpdateFunctionInput({ code, environmentVariables, description }) }));
     console.log('Updated verified WeChat function.');
   } else {
     await client.createFunction(new SDK.CreateFunctionRequest({ body: new SDK.CreateFunctionInput({ functionName: name, description, runtime: 'nodejs20', handler: 'index.handler', code, environmentVariables, memorySize: 256, cpu: 0.1, timeout: 180, diskSize: 512, instanceConcurrency: 1, internetAccess: true, disableInjectCredentials: 'All' }) }));
     console.log('Created independent WeChat function.');
   }
-  await client.putConcurrencyConfig(name, new SDK.PutConcurrencyConfigRequest({ body: new SDK.PutConcurrencyInput({ reservedConcurrency: 2 }) }));
+  if (publicChat) {
+    if (oldConcurrency !== undefined) await client.deleteConcurrencyConfig(name);
+    if (await readConcurrency() !== undefined) throw new Error('Custom concurrency cap still present');
+    console.log('Verified public POC mode and removal of the function-specific concurrency cap.');
+  } else await client.putConcurrencyConfig(name, new SDK.PutConcurrencyConfigRequest({ body: new SDK.PutConcurrencyInput({ reservedConcurrency: 2 }) }));
   let trigger;
   try { trigger = (await client.getTrigger(name, 'wechat-web')).body; } catch (e) { if (e.code !== 'TriggerNotFound') throw e; }
   if (!trigger) trigger = (await client.createTrigger(name, new SDK.CreateTriggerRequest({ body: new SDK.CreateTriggerInput({ triggerName: 'wechat-web', triggerType: 'http', qualifier: 'LATEST', description: 'Encrypted official account callbacks; HMAC-authenticated visitor chat', triggerConfig: JSON.stringify({ authType: 'anonymous', disableURLInternet: false, methods: ['GET', 'POST', 'OPTIONS'] }) }) }))).body;
@@ -52,9 +61,10 @@ async function main() {
   if (Object.entries(environmentVariables).some(([k, v]) => current.environmentVariables?.[k] !== v)) throw new Error('Environment verification failed');
   const url = new URL(trigger.httpTrigger?.urlInternet);
   if (url.protocol !== 'https:' || !url.hostname.endsWith('.cn-beijing.fcapp.run')) throw new Error('Unexpected endpoint');
-  const report = { name, url: url.origin, callback: url.origin + '/wechat/callback', chat: url.origin + '/chat', memorySize: current.memorySize, cpu: current.cpu, timeout: current.timeout, reservedConcurrency: 2, verifiedAt: new Date().toISOString() };
+  const report = { name, url: url.origin, callback: url.origin + '/wechat/callback', chat: url.origin + '/chat', memorySize: current.memorySize, cpu: current.cpu, timeout: current.timeout, publicChat, reservedConcurrency: publicChat ? null : 2, verifiedAt: new Date().toISOString() };
   fs.writeFileSync(path.join(out, 'deployment.json'), JSON.stringify(report, null, 2));
-  fs.writeFileSync(path.join(out, '公众号消息推送配置.local.txt'), `钻木者得火 · 消息推送配置（私密，勿上传 GitHub 或转发）\n\nAppID：wx6dde485592f7682e\nURL：${report.callback}\nToken：${secrets.WECHAT_TOKEN}\nEncodingAESKey：${secrets.WECHAT_AES_KEY}\n消息加解密方式：安全模式\n消息格式：XML\n\n保存并启用后，给公众号发送任意文字，点击返回的专属链接。\n入口有效期 24 小时；过期后重新发送文字获取入口。\n本方案不需要 AppSecret，无需设置服务器 IP 白名单。\n\nAPI Key 仅存于云函数环境变量，不在网页中。\n此文件与 secrets.local.json 仅保存在本地 output/wechat，已被 Git 忽略。\n`);
+  const guidance = publicChat ? '当前已启用公开 POC。公众号菜单发送固定链接即可：\nhttps://allenruan92.github.io/tax-law-chat/wechat.html\n入口无到期时间，无需令牌、体验码或登录。\n不需要重新启用开发者消息推送，以下回调配置仅作为可选兼容功能保留。' : '启用消息推送后，给公众号发送任意文字取得专属链接。入口有效期 24 小时。';
+  fs.writeFileSync(path.join(out, '公众号消息推送配置.local.txt'), `钻木者得火 · 消息推送配置（私密，勿上传 GitHub 或转发）\n\n${guidance}\n\nAppID：wx6dde485592f7682e\nURL：${report.callback}\nToken：${secrets.WECHAT_TOKEN}\nEncodingAESKey：${secrets.WECHAT_AES_KEY}\n消息加解密方式：安全模式\n消息格式：XML\n\n本方案不需要 AppSecret，无需设置服务器 IP 白名单。\nAPI Key 仅存于云函数环境变量，不在网页中。\n此文件与 secrets.local.json 仅保存在本地 output/wechat，已被 Git 忽略。\n`);
   console.log(JSON.stringify(report));
 }
 main().catch(e => { console.error(JSON.stringify({ error: 'WeChat deployment failed; secret details withheld', code: typeof e.code === 'string' ? e.code : undefined, status: e.statusCode })); process.exitCode = 1; });

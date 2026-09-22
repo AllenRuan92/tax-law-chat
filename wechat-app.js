@@ -2,31 +2,27 @@ import { DEFAULT_AGENT, buildMessages } from './lib/chat.js';
 import { renderMarkdown } from './lib/markdown.js';
 import { initConversationManager } from './conversation-manager.js?v=20260922-wechat';
 import { CHAT_ENDPOINT } from './wechat-config.js?v=20260922-wechat';
+import { HISTORY_PREFERENCE, chooseHistoryNamespace } from './lib/wechat-entry.js?v=20260922-public';
 
 const $ = id => document.getElementById(id), ACCESS = 'tax-law-wechat.access';
-let access = '', identity, manager, turns = [], active = null, ready = false, toastTimer;
+let manager, turns = [], active = null, ready = false, toastTimer;
 function toast(text) { $('toast').textContent = text; $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').hidden = true, 5000); }
-function readAccess() {
+async function historyNamespace() {
   const fragment = new URLSearchParams(location.hash.slice(1));
-  if (fragment.has('access')) {
-    access = fragment.get('access');
-    history.replaceState(null, '', location.pathname + location.search);
-    try { sessionStorage.setItem(ACCESS, access); } catch { toast('此浏览器无法暂存入口，刷新后请重新从公众号进入。'); }
-  } else try { access = sessionStorage.getItem(ACCESS) || ''; } catch {}
-  try {
-    if (!/^[\w-]+\.[\w-]+$/.test(access) || access.length > 1024) throw new Error();
-    identity = JSON.parse(atob(access.split('.')[0].replaceAll('-', '+').replaceAll('_', '/')));
-    if (!/^[a-f0-9]{32}$/.test(identity.sub) || identity.aud !== 'wx6dde485592f7682e' || !Number.isSafeInteger(identity.exp)) throw new Error();
-  } catch { access = ''; identity = null; try { sessionStorage.removeItem(ACCESS); } catch {} }
+  let legacy = fragment.get('access'), saved, databases = [];
+  if (fragment.has('access')) history.replaceState(null, '', location.pathname + location.search);
+  try { legacy ||= sessionStorage.getItem(ACCESS); sessionStorage.removeItem(ACCESS); } catch {}
+  try { saved = localStorage.getItem(HISTORY_PREFERENCE); } catch {}
+  if (!saved && !legacy) try { databases = await indexedDB.databases(); } catch {}
+  const selected = chooseHistoryNamespace({ saved, legacy, databases });
+  try { localStorage.setItem(HISTORY_PREFERENCE, selected); } catch {}
+  return selected;
 }
-function connected() { return Boolean(access && identity?.exp > Date.now() / 1000); }
 function refreshEntry() {
-  const valid = connected();
-  $('connection-label').textContent = valid ? '公众号入口' : '需要新入口';
-  $('connection-status').classList.toggle('configured', valid);
-  $('entry-notice').hidden = valid;
-  $('entry-notice').textContent = '请回到「钻木者得火」公众号，发送任意文字，再点击回复中的专属链接。入口 24 小时有效；原有对话仍保存在此浏览器。';
-  $('send-button').disabled = !valid || !ready || Boolean(active);
+  $('connection-label').textContent = '公开试用';
+  $('connection-status').classList.add('configured');
+  $('entry-notice').hidden = true;
+  $('send-button').disabled = !ready || Boolean(active);
 }
 function render() {
   $('welcome').hidden = Boolean(turns.length); $('messages').hidden = !turns.length;
@@ -61,7 +57,6 @@ function busy(value) {
 async function send() {
   const question = $('question').value.trim();
   if (!ready || !question || active || manager.isChanging()) return;
-  if (!connected()) { refreshEntry(); toast('请从公众号获取新的专属入口。'); return; }
   const messages = buildMessages(turns, question), answer = { id: crypto.randomUUID(), role: 'assistant', content: '', status: 'pending' };
   const request = new AbortController(); active = request; busy(true);
   turns.push({ id: crypto.randomUUID(), role: 'user', content: question, status: 'complete' }, answer); $('question').value = ''; render(); void manager.save();
@@ -69,8 +64,7 @@ async function send() {
   let timeout = false;
   const timer = setTimeout(() => { timeout = true; request.abort(); }, 175000);
   try {
-    const response = await fetch(CHAT_ENDPOINT, { method: 'POST', redirect: 'error', signal: request.signal, headers: { Authorization: 'Bearer ' + access, 'Content-Type': 'application/json' }, body: JSON.stringify({ messages }) });
-    if (response.status === 401) { access = ''; try { sessionStorage.removeItem(ACCESS); } catch {} refreshEntry(); }
+    const response = await fetch(CHAT_ENDPOINT, { method: 'POST', redirect: 'error', signal: request.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || '服务暂时不可用，请稍后重试。');
     if (typeof result.answer !== 'string' || !result.answer.trim()) throw new Error('回答未完整生成，请重新提问。');
@@ -82,15 +76,15 @@ async function send() {
     clearTimeout(timer); active = null; busy(false); render(); await manager.save();
   }
 }
-readAccess(); refreshEntry();
+const namespace = await historyNamespace();
+refreshEntry();
 $('chat-form').addEventListener('submit', event => { event.preventDefault(); void send(); });
 $('question').addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); void send(); } });
 $('question').addEventListener('input', () => { if (ready) void manager.save(); });
 $('stop-button').addEventListener('click', () => active?.abort());
 document.querySelectorAll('[data-question]').forEach(button => button.addEventListener('click', () => { $('question').value = button.dataset.question; $('question').focus(); if (ready) void manager.save(); }));
-manager = await initConversationManager({ namespace: 'tax-law-wechat.' + (identity?.sub || 'guest'),
+manager = await initConversationManager({ namespace,
   getState: () => ({ agent: DEFAULT_AGENT, turns, draft: $('question').value }),
   setState: row => { turns = row.turns; $('question').value = row.draft; render(); $('scroll-area').scrollTop = $('scroll-area').scrollHeight; },
   isBusy: () => Boolean(active), toast });
 ready = true; busy(false);
-setInterval(refreshEntry, 30000);

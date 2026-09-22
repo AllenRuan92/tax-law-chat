@@ -4,7 +4,7 @@
 
 访问：<https://allenruan92.github.io/tax-law-chat/>
 
-公众号访客请使用独立的[公众号聊天页](https://allenruan92.github.io/tax-law-chat/wechat.html)：从「钻木者得火」的回复取得专属入口，无需填写 Key，没有知识库管理权限。后端接入方式与配置步骤见 [公众号接入说明](wechat/README.md)。原管理页仍保持上述 Key 连接方式。
+公众号访客请使用独立的[公众号聊天页](https://allenruan92.github.io/tax-law-chat/wechat.html)：当前为公开 POC，固定链接不设到期时间，打开即可提问，无需登录、体验码或 API Key，没有知识库管理权限。按所有者要求未设置自定义调用次数/并发上限；任何拿到链接的人都能使用，费用计入所有者账号。部署方式见 [公众号接入说明](wechat/README.md)。原管理页仍保持原有 Key 连接方式。
 
 ## 使用
 

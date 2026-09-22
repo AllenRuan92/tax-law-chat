@@ -22,20 +22,24 @@ export async function testEntry() {
   if (response.status !== 200) throw new Error('Encrypted callback failed, status ' + response.status);
   const outer = parseXml(await response.text()); verifySignature(outer.MsgSignature, env.WECHAT_TOKEN, outer.TimeStamp, outer.Nonce, outer.Encrypt);
   const content = parseXml(decrypt(outer.Encrypt, env.WECHAT_AES_KEY, APP_ID)).Content;
-  const token = /#access=([\w.-]+)/.exec(content)?.[1]; verifyAccess(token, env.SESSION_SIGNING_KEY, APP_ID);
-  return { token, callbackMs: Date.now() - start, endpoint: deployment.chat };
+  const token = /#access=([\w.-]+)/.exec(content)?.[1];
+  if (deployment.publicChat) {
+    if (token || !content.includes('href="https://allenruan92.github.io/tax-law-chat/wechat.html"') || content.includes('24 小时')) throw new Error('Expected the fixed public entry');
+  } else verifyAccess(token, env.SESSION_SIGNING_KEY, APP_ID);
+  return { token, publicChat: deployment.publicChat === true, callbackMs: Date.now() - start, endpoint: deployment.chat };
 }
 async function main() {
   const entry = await testEntry();
   const headers = { Origin: 'https://allenruan92.github.io', 'Content-Type': 'application/json' };
   const body = JSON.stringify({ messages: [{ role: 'user', content: '请简要说明公司制基金与合伙制基金在所得税纳税主体上的区别，并列出资料依据。' }] });
-  const denied = await fetch(entry.endpoint, { method: 'POST', headers, body, signal: AbortSignal.timeout(30000) });
-  if (denied.status !== 401) throw new Error('Anonymous chat was not rejected');
+  // Invalid input exercises the public path without incurring an extra model call.
+  const denied = await fetch(entry.endpoint, { method: 'POST', headers, body: JSON.stringify({ messages: [] }), signal: AbortSignal.timeout(30000) });
+  if (denied.status !== (entry.publicChat ? 400 : 401)) throw new Error('Unexpected input validation status');
   const preflight = await fetch(entry.endpoint, { method: 'OPTIONS', headers: { Origin: headers.Origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'authorization,content-type' }, signal: AbortSignal.timeout(30000) });
   if (preflight.status !== 204 || preflight.headers.get('access-control-allow-origin') !== headers.Origin) throw new Error('Preflight failed');
-  const report = { verifiedAt: new Date().toISOString(), encryptedCallback: true, callbackMs: entry.callbackMs, anonymousRejected: true, cors: true };
+  const report = { verifiedAt: new Date().toISOString(), encryptedCallback: true, callbackMs: entry.callbackMs, publicChat: entry.publicChat, invalidInputRejected: true, cors: true };
   if (process.argv.includes('--chat')) {
-    const response = await fetch(entry.endpoint, { method: 'POST', headers: { ...headers, Authorization: 'Bearer ' + entry.token }, body, signal: AbortSignal.timeout(175000) });
+    const response = await fetch(entry.endpoint, { method: 'POST', headers: { ...headers, ...(entry.publicChat ? {} : { Authorization: 'Bearer ' + entry.token }) }, body, signal: AbortSignal.timeout(175000) });
     if (response.status !== 200) throw new Error('Live chat failed, status ' + response.status);
     const result = await response.json();
     if (!result.answer || typeof result.answer !== 'string') throw new Error('Missing answer');
