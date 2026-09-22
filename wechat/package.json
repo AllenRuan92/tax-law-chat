@@ -1,0 +1,11 @@
+{
+  "name": "tax-law-wechat-gateway",
+  "private": true,
+  "type": "module",
+  "dependencies": { "fast-xml-parser": "5.11.1" },
+  "devDependencies": {
+    "@alicloud/fc20230330": "4.8.2",
+    "@alicloud/openapi-core": "1.0.8",
+    "esbuild": "0.25.12"
+  }
+}

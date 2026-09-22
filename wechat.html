@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://tax-lawchat-bot-kycjexvvew.cn-beijing.fcapp.run; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta name="description" content="钻木者得火 · 中国大陆一级市场股权投资税务知识问答。">
+  <title>税务案头 · 钻木者得火</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=20260922-wechat">
+  <link rel="stylesheet" href="./wechat.css?v=20260922-wechat">
+  <script type="module" src="./wechat-app.js?v=20260922-wechat"></script>
+</head>
+<body class="wechat-page">
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="本机对话">
+      <a class="brand" href="./wechat.html"><svg viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M8 4h14l6 6v22H8zM22 4v7h6M13 17h10M13 22h10M13 27h6" stroke="currentColor" stroke-width="1.8"/></svg><span>税务案头<small>钻木者得火 · 公众号问答</small></span></a>
+      <button id="new-chat" class="new-chat" disabled><span aria-hidden="true">＋</span> 新建对话</button>
+      <button id="open-history" class="mobile-history" aria-label="历史对话">☷</button>
+      <section class="history-panel" aria-label="本机历史对话">
+        <div class="history-heading"><span class="eyebrow">本机对话</span><span>仅存此浏览器</span></div>
+        <div class="history-list" data-conversation-list></div>
+        <div class="history-backup"><button class="text-button" data-export-history>导出备份</button><button class="text-button" data-import-history>导入备份</button></div>
+      </section>
+      <div class="sidebar-bottom"><div class="reader-note"><span class="eyebrow">研究范围</span><p>中国大陆<br>一级市场股权投资税务</p><small>提问时说明主体类型、交易日期和投资阶段，会更有帮助。</small></div><p class="sidebar-note">对话保存在此浏览器。清理站点数据会删除记录，请定期备份。</p></div>
+    </aside>
+    <main class="workspace">
+      <header class="topbar"><div><span class="eyebrow">公众号问答</span><span id="current-title" class="topbar-title">新对话</span></div><span id="connection-status" class="connection-badge"><span class="small-dot"></span><span id="connection-label">正在准备</span></span></header>
+      <div id="entry-notice" class="entry-notice" role="status" hidden></div>
+      <div class="scroll-area" id="scroll-area">
+        <section class="welcome" id="welcome">
+          <div class="welcome-kicker"><span></span> 钻木者得火 · 知识库试用</div>
+          <h1>把税务问题，<br><em>问清楚。</em></h1>
+          <p class="welcome-description">从基金设立到投资退出，查阅已有资料。<br>在一段对话中继续追问，或另开一个新问题。</p>
+          <div class="suggestions" aria-label="示例问题">
+            <button class="suggestion" data-question="公司制基金与合伙制基金，所得税处理有什么区别？"><span>基金架构</span><strong>公司制与合伙制，如何计税？</strong><i aria-hidden="true">↗</i></button>
+            <button class="suggestion" data-question="享受创投投资额70%抵扣优惠，需要核查哪些条件和材料？"><span>创投优惠</span><strong>70% 抵扣，要核实哪些条件？</strong><i aria-hidden="true">↗</i></button>
+            <button class="suggestion" data-question="基金退出未上市项目股权时，需要留意哪些税务问题？"><span>退出安排</span><strong>退出未上市项目，要留意什么？</strong><i aria-hidden="true">↗</i></button>
+          </div>
+          <div class="scope-note"><span aria-hidden="true">▤</span><p>回答基于试用知识库，不保证资料完备或实时更新。请核对法规原文、适用时间与主管税务机关口径。</p></div>
+        </section>
+        <section id="messages" class="messages" aria-label="对话记录" hidden></section>
+      </div>
+      <footer class="composer-area">
+        <form id="chat-form" class="composer"><label class="sr-only" for="question">输入税务问题</label><textarea id="question" rows="2" maxlength="6000" placeholder="描述你的问题，也可以继续追问…"></textarea><div class="composer-toolbar"><span id="composer-hint">Enter 发送 · Shift + Enter 换行</span><button id="send-button" class="send-button" type="submit" disabled>发送 ↑</button><button id="stop-button" type="button" class="stop-button" hidden>停止等待</button></div></form>
+        <p class="footer-note">仅供研究参考，不构成税务意见。请勿输入身份证号等敏感资料。</p><p class="footer-note" data-history-status></p>
+      </footer>
+    </main>
+  </div>
+  <dialog id="history-dialog" aria-labelledby="history-title"><div class="dialog-heading"><div><p class="eyebrow">保存在此浏览器</p><h2 id="history-title">历史对话</h2></div><button id="close-history" class="close-button" aria-label="关闭历史对话">×</button></div><button id="history-new" class="new-chat">＋ 新建对话</button><div class="history-list" data-conversation-list></div><div class="history-backup"><button class="text-button" data-export-history>导出备份</button><button class="text-button" data-import-history>导入备份</button></div><p class="field-help" data-history-status></p></dialog>
+  <dialog id="conversation-dialog" aria-labelledby="conversation-title"><form id="conversation-form"><div class="dialog-heading"><h2 id="conversation-title">管理对话</h2><button id="close-conversation" type="button" class="close-button" aria-label="关闭管理对话">×</button></div><label for="conversation-name">对话名称</label><input id="conversation-name" maxlength="80" required><p id="conversation-error" class="settings-error" role="alert"></p><div class="dialog-actions"><button id="delete-conversation" type="button" class="text-button">删除对话</button><button type="submit" class="primary-button">保存名称</button></div></form></dialog>
+  <input id="history-file" type="file" accept=".json,application/json" hidden>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

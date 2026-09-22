@@ -4,6 +4,8 @@
 
 访问：<https://allenruan92.github.io/tax-law-chat/>
 
+公众号访客请使用独立的[公众号聊天页](https://allenruan92.github.io/tax-law-chat/wechat.html)：从「钻木者得火」的回复取得专属入口，无需填写 Key，没有知识库管理权限。后端接入方式与配置步骤见 [公众号接入说明](wechat/README.md)。原管理页仍保持上述 Key 连接方式。
+
 ## 使用
 
 1. 打开网页，点击「连接设置」，填入百炼 API Key。应用 ID 已预设。

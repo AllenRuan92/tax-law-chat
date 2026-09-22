@@ -1,19 +1,19 @@
 import { DEFAULT_AGENT } from './lib/chat.js';
 import { cleanConversation, conversationTitle, newConversation, openConversationStore,
-  memoryConversationStore, HistoryConflict, exportConversations, parseBackup, MAX_BACKUP_BYTES } from './lib/conversations.js';
+  memoryConversationStore, HistoryConflict, exportConversations, parseBackup, MAX_BACKUP_BYTES } from './lib/conversations.js?v=20260922-wechat';
 
-const ACTIVE = 'tax-law-chat.active.v2', RECOVERY = 'tax-law-chat.recovery.v2', LEGACY = 'tax-law-chat.v1';
 const $ = id => document.getElementById(id);
 const sessionGet = name => { try { return sessionStorage.getItem(name); } catch { return null; } };
 const sessionSet = (name, value) => { try { value === null ? sessionStorage.removeItem(name) : sessionStorage.setItem(name, value); } catch {} };
 const signature = row => JSON.stringify([row.agent, row.title, row.turns, row.draft]);
 
-export async function initConversationManager({ getState, setState, isBusy, toast, importedAgent }) {
+export async function initConversationManager({ getState, setState, isBusy, toast, importedAgent, namespace = 'tax-law-chat' }) {
+  const ACTIVE = namespace + '.active.v2', RECOVERY = namespace + '.recovery.v2', LEGACY = namespace + '.v1', MEMORY = namespace + '.memory.v2';
   let store, current, rows = [], queue = Promise.resolve(), editTarget, changing = false, warning = '', sequence = 0;
   let channel;
-  try { channel = new BroadcastChannel('tax-law-chat.history'); } catch {}
-  try { store = await openConversationStore(); rows = await store.list(); }
-  catch { store = memoryConversationStore(); warning = '本地数据库不可用：记录暂存当前标签页，请及时导出备份。'; }
+  try { channel = new BroadcastChannel(namespace + '.history'); } catch {}
+  try { store = await openConversationStore(globalThis.indexedDB, namespace + '.history.v2'); rows = await store.list(); }
+  catch { store = memoryConversationStore(undefined, MEMORY); warning = '本地数据库不可用：记录暂存当前标签页，请及时导出备份。'; }
   function status() {
     for (const node of document.querySelectorAll('[data-history-status]')) {
       node.textContent = warning || '保存在此浏览器 · 不与同事或其他设备同步';
@@ -133,14 +133,14 @@ export async function initConversationManager({ getState, setState, isBusy, toas
 
   // Old single-tab conversations are migrated atomically and only removed after a durable commit.
   let initialId = sessionGet(ACTIVE);
-  const temporary = sessionGet('tax-law-chat.memory.v2');
+  const temporary = sessionGet(MEMORY);
   if (store.durable && temporary) {
     try {
       for (const row of JSON.parse(temporary)) {
         const id = await store.migrate('temporary-' + row.id + '-' + row.revision, { ...row, id: crypto.randomUUID() });
         if (row.id === initialId) initialId = id;
       }
-      sessionSet('tax-law-chat.memory.v2', null);
+      sessionSet(MEMORY, null);
     } catch { warning = '临时记录尚未全部恢复，请保留当前标签页并导出备份。'; }
   }
   const legacy = sessionGet(LEGACY);
@@ -176,7 +176,7 @@ export async function initConversationManager({ getState, setState, isBusy, toas
     try { return await store.save(newConversation(agent), 0); }
     catch {
       // Full/disabled site storage must not leave the entire UI stuck at startup.
-      store = memoryConversationStore(rows);
+      store = memoryConversationStore(rows, MEMORY);
       warning = '本地数据库无法写入：记录暂存当前标签页，请及时导出备份。';
       return store.save(newConversation(agent), 0);
     }
