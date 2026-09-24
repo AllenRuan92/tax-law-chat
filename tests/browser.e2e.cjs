@@ -8,7 +8,7 @@ const site = 'https://allenruan92.github.io/tax-law-chat/';
 const origin = 'https://llm-zc86z2f8ixro6odd.cn-beijing.maas.aliyuncs.com';
 const agent = 'aid-c13de479d8944f12b3c45ef9a45af154';
 const legacy = { agent, turns: [{ role: 'user', content: '旧记录：合伙基金税务', status: 'complete' }, { role: 'assistant', content: '旧回答须保留。', status: 'complete' }] };
-const assets = new Set(['index.html', 'app.js', 'conversation-manager.js', 'knowledge-manager.js', 'styles.css', 'favicon.svg', 'lib/chat.js', 'lib/conversations.js', 'lib/markdown.js', 'lib/knowledge.js', 'lib/config.js', 'lib/md5.js']);
+const assets = new Set(['index.html', 'app.js', 'conversation-manager.js', 'knowledge-manager.js', 'review-manager.js', 'styles.css', 'favicon.svg', 'lib/chat.js', 'lib/conversations.js', 'lib/markdown.js', 'lib/knowledge.js', 'lib/review.js', 'lib/config.js', 'lib/md5.js']);
 const out = path.join(root, 'output/playwright'); fs.mkdirSync(out, { recursive: true });
 const errors = [], calls = [];
 const say = step => console.log(JSON.stringify({ step }));

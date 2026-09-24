@@ -1,0 +1,10 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "ram:PassRole",
+      "Resource": "acs:ram::1555315958533569:role/taxlawweeklycollectorrole"
+    }
+  ]
+}

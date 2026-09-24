@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = new URL('../', import.meta.url);
-const allowed = new Set(['index.html', 'app.js', 'conversation-manager.js', 'knowledge-manager.js', 'styles.css', 'favicon.svg', 'lib/chat.js', 'lib/conversations.js', 'lib/markdown.js', 'lib/knowledge.js', 'lib/md5.js', 'lib/config.js']);
+const allowed = new Set(['index.html', 'app.js', 'conversation-manager.js', 'knowledge-manager.js', 'review-manager.js', 'styles.css', 'favicon.svg', 'lib/chat.js', 'lib/conversations.js', 'lib/markdown.js', 'lib/knowledge.js', 'lib/review.js', 'lib/md5.js', 'lib/config.js']);
 for (const file of ['wechat.html', 'wechat-app.js', 'wechat-config.js', 'wechat.css', 'lib/wechat-entry.js']) allowed.add(file);
 const types = { html: 'text/html; charset=utf-8', js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', svg: 'image/svg+xml' };
 const port = Number(process.env.PORT || 4173);

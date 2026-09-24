@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://llm-zc86z2f8ixro6odd.cn-beijing.maas.aliyuncs.com https://dashscope-file-datacenter-prod-01.oss-cn-beijing.aliyuncs.com https://tax-lawad-proxy-mosqgiygtw.cn-beijing.fcapp.run; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://llm-zc86z2f8ixro6odd.cn-beijing.maas.aliyuncs.com https://dashscope-file-datacenter-prod-01.oss-cn-beijing.aliyuncs.com https://tax-lawad-proxy-mosqgiygtw.cn-beijing.fcapp.run https://tax-lawview-api-yzkotxgfpw.cn-beijing.fcapp.run; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'">
   <meta name="description" content="中国大陆一级市场股权投资税务知识问答测试。">
   <title>税务案头 · 一级市场知识问答</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./styles.css?v=20260922-history">
-  <script type="module" src="./app.js?v=20260922-history"></script>
+  <link rel="stylesheet" href="./styles.css?v=20260924-review">
+  <script type="module" src="./app.js?v=20260924-review"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -33,6 +33,7 @@
         <div class="kb-label"><span class="small-dot"></span> tax-law-poc</div>
       </details>
       <div class="sidebar-bottom">
+        <button id="open-review" class="nav-button" title="待审核入库"><span aria-hidden="true">◫</span> 待审核入库</button>
         <button id="open-knowledge" class="nav-button" title="知识库管理"><span aria-hidden="true">▤</span> 知识库管理</button>
         <button id="share-link" class="nav-button"><span aria-hidden="true">↗</span> 复制体验链接</button>
         <button id="export-chat" class="nav-button"><span aria-hidden="true">↓</span> 导出对话</button>
@@ -109,6 +110,40 @@
       </section>
       <p class="management-note">小范围 POC：持有当前 Key 的试用者均可管理资料。移除只影响本知识库，源文件保留在百炼数据中心；此处不提供删除整个知识库的操作。</p>
     </div>
+  </dialog>
+  <dialog id="review-dialog" class="review-dialog" aria-labelledby="review-title">
+    <div class="review-heading">
+      <div><p class="eyebrow">税务案头 / 资料管理</p><h2 id="review-title">待审核入库</h2><p>官方材料先核验，再决定是否进入知识库。</p></div>
+      <div class="review-heading-right"><span id="review-run" class="review-run">读取采集记录中…</span><button id="close-review" type="button" class="close-button" aria-label="关闭待审核入库">×</button></div>
+    </div>
+    <div class="review-tabs" role="tablist" aria-label="资料审核状态">
+      <button type="button" class="review-tab active" data-review-status="pending_review" role="tab" aria-selected="true">待审核 <span id="review-count-pending">—</span></button>
+      <button type="button" class="review-tab" data-review-status="approved" role="tab" aria-selected="false">已批准待发布 <span id="review-count-approved">—</span></button>
+      <button type="button" class="review-tab" data-review-status="processing" role="tab" aria-selected="false">发布处理中 <span id="review-count-processing">—</span></button>
+      <button type="button" class="review-tab" data-review-status="history" role="tab" aria-selected="false">处理记录 <span id="review-count-history">—</span></button>
+    </div>
+    <div class="review-toolbar">
+      <label class="sr-only" for="review-search">搜索标题或文号</label><input id="review-search" type="search" placeholder="搜索标题或文号" maxlength="100">
+      <label class="sr-only" for="review-kind">来源类型</label><select id="review-kind"><option value="">全部类型</option><option value="policy">政策原文</option><option value="interpretation">官方解读</option></select>
+      <label class="sr-only" for="review-priority">相关性</label><select id="review-priority"><option value="">全部相关性</option><option value="high">高相关</option><option value="medium">中相关</option><option value="low">低相关</option></select>
+      <button id="review-refresh" type="button" class="secondary-button">刷新资料</button>
+    </div>
+    <p id="review-error" class="review-error" role="alert" hidden></p>
+    <div class="review-workspace">
+      <section class="review-list-pane" aria-label="资料清单"><div id="review-list" class="review-list" aria-live="polite"></div><div class="review-pagination"><button id="review-prev" type="button" class="text-button" disabled>上一页</button><span id="review-page">第 1 页</span><button id="review-next" type="button" class="text-button" disabled>下一页</button></div></section>
+      <section id="review-detail" class="review-detail" aria-label="资料详情"><p class="review-empty">从左侧选择一份资料，查看原文与审核证据。</p></section>
+    </div>
+    <p class="review-footnote">私有 OSS 保存原始证据。批准不自动入库；索引完成后仍需问答抽验。共享 Key 下审核人须手填。</p>
+  </dialog>
+  <dialog id="review-decision-dialog" class="review-decision-dialog" aria-labelledby="review-decision-title">
+    <form id="review-decision-form">
+      <h2 id="review-decision-title">审核资料</h2><p id="review-decision-name" class="dialog-description"></p>
+      <label for="review-reviewer">审核人</label><input id="review-reviewer" required minlength="2" maxlength="80" autocomplete="name">
+      <div id="review-approval-fields"><label for="review-applicable">适用起始日</label><input id="review-applicable" type="date"><label for="review-effective">施行日（原文未明确可留空）</label><input id="review-effective" type="date"><label class="review-confirm"><input id="review-confirm-original" type="checkbox"> 我已核对官方原文、效力和适用期间</label></div>
+      <label id="review-note-label" for="review-note">核验依据</label><textarea id="review-note" rows="4" minlength="8" maxlength="2000" required placeholder="记录原文、效力和适用期间的核验依据；施行日未明确时请说明。"></textarea>
+      <p id="review-decision-error" class="settings-error" role="alert"></p>
+      <div class="dialog-actions"><button id="review-decision-cancel" type="button" class="text-button">取消</button><button id="review-decision-submit" type="submit" class="primary-button">确认审核通过</button></div>
+    </form>
   </dialog>
   <dialog id="remove-document-dialog" aria-labelledby="remove-document-title">
     <h2 id="remove-document-title">从知识库移除此文档？</h2>

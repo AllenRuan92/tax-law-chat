@@ -1,0 +1,30 @@
+edition: 3.0.0
+name: tax-law-weekly-collector
+access: ${env('TAX_FC_ACCESS', 'tax-fc-ak')}
+resources:
+  collector:
+    component: fc3
+    props:
+      region: cn-beijing
+      functionName: tax-law-weekly-collector
+      description: Weekly official tax law collection to private review archive; no knowledge publishing
+      runtime: nodejs20
+      handler: index.handler
+      code: ${env('TAX_AGENT_PACKAGE_DIR')}
+      memorySize: 256
+      cpu: 0.25
+      timeout: 300
+      internetAccess: true
+      instanceConcurrency: 1
+      concurrencyConfig:
+        reservedConcurrency: 1
+      role: ${env('TAX_AGENT_ROLE_ARN')}
+      environmentVariables:
+        TAX_AGENT_BUCKET: ${env('TAX_AGENT_BUCKET')}
+      triggers:
+        - triggerName: weekly-official-tax-collect
+          triggerType: timer
+          triggerConfig:
+            cronExpression: CRON_TZ=Asia/Shanghai 0 0 9 * * MON
+            enable: true
+            payload: '{}'

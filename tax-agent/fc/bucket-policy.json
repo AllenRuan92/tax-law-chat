@@ -1,0 +1,17 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": ["acs:ram::1555315958533569:role/taxlawweeklycollectorrole"],
+      "Action": ["oss:ListObjects", "oss:ListObjectsV2"],
+      "Resource": ["acs:oss:*:*:tax-law-agent-1555315958533569-cn-beijing"]
+    },
+    {
+      "Effect": "Allow",
+      "Principal": ["acs:ram::1555315958533569:role/taxlawweeklycollectorrole"],
+      "Action": ["oss:GetObject", "oss:PutObject"],
+      "Resource": ["acs:oss:*:*:tax-law-agent-1555315958533569-cn-beijing/tax-agent/v1/*"]
+    }
+  ]
+}

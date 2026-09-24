@@ -1,0 +1,35 @@
+edition: 3.0.0
+name: tax-law-review-api
+access: ${env('TAX_FC_ACCESS', 'tax-fc-ak')}
+resources:
+  reviewApi:
+    component: fc3
+    props:
+      region: cn-beijing
+      functionName: tax-law-review-api
+      description: Private OSS tax material review and controlled Bailian publishing
+      runtime: nodejs20
+      handler: index.handler
+      code: ${env('TAX_REVIEW_PACKAGE_DIR')}
+      memorySize: 256
+      diskSize: 512
+      cpu: 0.25
+      timeout: 120
+      internetAccess: true
+      instanceConcurrency: 1
+      concurrencyConfig:
+        reservedConcurrency: 2
+      role: ${env('TAX_AGENT_ROLE_ARN')}
+      environmentVariables:
+        TAX_AGENT_BUCKET: ${env('TAX_AGENT_BUCKET')}
+        API_KEY_SHA256: ${env('TAX_UPLOAD_KEY_SHA256')}
+        ALLOWED_ORIGINS: https://allenruan92.github.io
+      triggers:
+        - triggerName: web-review
+          triggerType: http
+          triggerConfig:
+            authType: anonymous
+            disableURLInternet: false
+            methods:
+              - POST
+              - OPTIONS

@@ -1,0 +1,15 @@
+{
+  "Version": "1",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["oss:ListObjects", "oss:ListObjectsV2"],
+      "Resource": "acs:oss:*:*:tax-law-agent-1555315958533569-cn-beijing"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["oss:GetObject", "oss:PutObject"],
+      "Resource": "acs:oss:*:*:tax-law-agent-1555315958533569-cn-beijing/tax-agent/v1/*"
+    }
+  ]
+}

@@ -1,11 +1,12 @@
 import { DEFAULT_AGENT, ENDPOINT, buildMessages, eventMeaning, readSSE } from './lib/chat.js';
 import { renderMarkdown } from './lib/markdown.js';
 import { initKnowledgeManager } from './knowledge-manager.js?v=20260922-history';
+import { initReviewManager } from './review-manager.js?v=20260924-review';
 import { initConversationManager } from './conversation-manager.js?v=20260922-history';
 
 const $ = id => document.getElementById(id);
 const KEY_STORE = 'tax-law-chat.key';
-let key = '', agent = DEFAULT_AGENT, turns = [], active = null, toastTimer, conversationManager, importedAgent, historyReady = false;
+let key = '', agent = DEFAULT_AGENT, turns = [], active = null, toastTimer, conversationManager, importedAgent, historyReady = false, reviewManager;
 const nodes = new Map();
 
 function toast(message) {
@@ -194,7 +195,7 @@ $('settings-dialog').addEventListener('close', () => { $('api-key').value = ''; 
 $('settings-form').addEventListener('submit', async event => {
   event.preventDefault();
   if (!historyReady || conversationManager.isChanging()) return;
-  if (active || knowledgeManager.isBusy()) { $('settings-error').textContent = '请先结束当前问答或文件操作，再修改连接设置。'; return; }
+  if (active || knowledgeManager.isBusy() || reviewManager.isBusy()) { $('settings-error').textContent = '请先结束当前问答或文件操作，再修改连接设置。'; return; }
   const nextKey = $('api-key').value.trim(), nextAgent = $('agent-id').value.trim();
   if (!nextKey || /\s/.test(nextKey) || nextKey.length > 4096) { $('settings-error').textContent = '请填入有效的 API Key，不要包含空格或换行。'; return; }
   if (!/^aid-[\w-]+$/.test(nextAgent)) { $('settings-error').textContent = '请填写知识问答服务的应用 ID（aid- 开头）。'; return; }
@@ -203,7 +204,7 @@ $('settings-form').addEventListener('submit', async event => {
   $('settings-dialog').close(); toast('连接设置已保存，发送问题即可验证。'); $('question').focus();
 });
 $('forget-key').addEventListener('click', () => {
-  if (active || knowledgeManager.isBusy()) { $('settings-error').textContent = '请先结束当前问答或文件操作，再清除 Key。'; return; }
+  if (active || knowledgeManager.isBusy() || reviewManager.isBusy()) { $('settings-error').textContent = '请先结束当前问答或文件操作，再清除 Key。'; return; }
   key = ''; persist(); updateConnection(); $('api-key').value = '';
   toast('当前标签页的 Key 已清除；已发出的体验链接仍可使用。');
 });
@@ -225,6 +226,7 @@ $('export-chat').addEventListener('click', () => {
 });
 restore(); updateConnection(); renderAll();
 const knowledgeManager = initKnowledgeManager({ getKey: () => key, openSettings, toast });
+reviewManager = initReviewManager({ getKey: () => key, openSettings, toast });
 $('send-button').disabled = true; $('new-chat').disabled = true;
 conversationManager = await initConversationManager({
   getState: () => ({ agent, turns, draft: $('question').value }),

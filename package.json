@@ -5,7 +5,15 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/serve.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "tax:collect": "node tax-agent/cli.mjs collect",
+    "tax:list": "node tax-agent/cli.mjs list",
+    "tax:report": "node tax-agent/cli.mjs report"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ali-oss": "6.23.0"
+  }
 }
